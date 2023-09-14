@@ -12,7 +12,7 @@ import {
   EventStreamContentType,
   fetchEventSource,
 } from "@fortaine/fetch-event-source";
-import { prettyObject } from "@/app/utils/format";
+import { prettyObject, extractCPMBeeResponse } from "@/app/utils/format";
 import { getClientConfig } from "@/app/config/client";
 
 export interface OpenAIListModelResponse {
@@ -130,6 +130,14 @@ export class ChatGPTApi implements LLMApi {
             ) {
               const responseTexts = [responseText];
               let extraInfo = await res.clone().text();
+              if (requestPayload.model.indexOf("cpm-bee") != -1) { 
+                try {
+                  const resJson = await res.clone().json();
+                  responseText = extractCPMBeeResponse(resJson);
+
+                  return finish();
+                } catch {}
+              }
               try {
                 const resJson = await res.clone().json();
                 extraInfo = prettyObject(resJson);
@@ -178,7 +186,7 @@ export class ChatGPTApi implements LLMApi {
         clearTimeout(requestTimeoutId);
 
         const resJson = await res.json();
-        const message = this.extractMessage(resJson);
+        const message = requestPayload.model.indexOf("cpm-bee") != -1 ? extractCPMBeeResponse(resJson) : this.extractMessage(resJson);
         options.onFinish(message);
       }
     } catch (e) {

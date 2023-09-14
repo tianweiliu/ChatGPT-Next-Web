@@ -66,11 +66,7 @@ export const OpenaiPath = {
 };
 
 export const DEFAULT_INPUT_TEMPLATE = `{{input}}`; // input / time / model / lang
-export const DEFAULT_SYSTEM_TEMPLATE = `
-You are ChatGPT, a large language model trained by OpenAI.
-Knowledge cutoff: 2021-09
-Current model: {{model}}
-Current time: {{time}}`;
+export const DEFAULT_SYSTEM_TEMPLATE = ``;
 
 export const SUMMARIZE_MODEL = "gpt-3.5-turbo";
 
@@ -117,6 +113,10 @@ export const DEFAULT_MODELS = [
   },
   {
     name: "gpt-3.5-turbo-16k-0613",
+    available: true,
+  },
+  {
+    name: "cpm-bee-230913084052OZPY",
     available: true,
   },
 ] as const;

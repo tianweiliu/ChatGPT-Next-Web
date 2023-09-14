@@ -11,3 +11,14 @@ export function prettyObject(msg: any) {
   }
   return ["```json", msg, "```"].join("\n");
 }
+
+export function extractCPMBeeResponse(res: any) {
+  let result = "";
+  try {
+    if (res.code == 0) {
+      const data = JSON.parse(res.data.data);
+      result = data["<ans>"];
+    }
+  } catch {}
+  return result;
+}

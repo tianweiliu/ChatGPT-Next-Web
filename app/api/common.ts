@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import MD5 from 'crypto-js/md5';
 
 export const OPENAI_URL = "api.openai.com";
 const DEFAULT_PROTOCOL = "https";
 const PROTOCOL = process.env.PROTOCOL || DEFAULT_PROTOCOL;
 const BASE_URL = process.env.BASE_URL || OPENAI_URL;
 const DISABLE_GPT4 = !!process.env.DISABLE_GPT4;
+const CPM_BEE_SK = process.env.CPM_BEE_SK || "";
+const CPM_BEE_ENDPOINT = process.env.CPM_BEE_ENDPOINT || "inference";
 
 export async function requestOpenai(req: NextRequest) {
   const controller = new AbortController();
@@ -35,12 +38,15 @@ export async function requestOpenai(req: NextRequest) {
     controller.abort();
   }, 10 * 60 * 1000);
 
-  const fetchUrl = `${baseUrl}/${openaiPath}`;
+  const body = await req.json();
+  const isCPMBee = body && body.model && body.model.indexOf("cpm-bee") != -1;
+
+  const fetchUrl = isCPMBee ? `${baseUrl}/${CPM_BEE_ENDPOINT}` : `${baseUrl}/${openaiPath}`;
   const fetchOptions: RequestInit = {
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
-      Authorization: authValue,
+      ...(!isCPMBee && { Authorization: authValue }),
       ...(process.env.OPENAI_ORG_ID && {
         "OpenAI-Organization": process.env.OPENAI_ORG_ID,
       }),
@@ -53,6 +59,39 @@ export async function requestOpenai(req: NextRequest) {
     duplex: "half",
     signal: controller.signal,
   };
+  if (isCPMBee) {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const sig = `${timestamp}${CPM_BEE_SK}`;
+    const sign = MD5(Buffer.from(sig, 'utf-8').toString()).toString();
+    let input = "";
+    let prompt = "问答";
+    let question = "";
+    for (let i = 0; i < body.messages.length; i++) {
+      const message = body.messages[i];
+      if (message.role == "system") {
+        if (message.content.trim() != "")
+          question = message.content.trim();
+      } else {
+        input += `${message.role == "user" ? "用户：": "AI："}${message.content.trim()}` + "\n<sep>";
+      }
+      // console.log(message, question, input);
+    }
+    input += `AI:\n`;
+    if (question == "")
+      question = "该如何回复用户？";
+    fetchOptions.body = JSON.stringify({
+      endpoint_name: body.model,
+      ak: authValue.replace("Bearer ", "").trim(),
+      timestamp,
+      sign,
+      input: JSON.stringify({
+        input,
+        prompt,
+        question,
+        "<ans>": ""
+      }),
+    });
+  }
 
   // #1815 try to refuse gpt4 request
   if (DISABLE_GPT4 && req.body) {
