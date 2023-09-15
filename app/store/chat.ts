@@ -499,9 +499,6 @@ export const useChatStore = createPersistStore(
         const config = useAppConfig.getState();
         const session = get().currentSession();
 
-        if (getSummarizeModel(session.mask.modelConfig.model).indexOf("cpm-bee") != -1)
-          return;
-
         // remove error messages if any
         const messages = session.messages;
 
