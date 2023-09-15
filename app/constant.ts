@@ -116,7 +116,7 @@ export const DEFAULT_MODELS = [
     available: true,
   },
   {
-    name: "cpm-bee-230913084052OZPY",
+    name: "cpm-bee-hackthon",
     available: true,
   },
 ] as const;

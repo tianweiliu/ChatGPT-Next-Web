@@ -7,7 +7,8 @@ const PROTOCOL = process.env.PROTOCOL || DEFAULT_PROTOCOL;
 const BASE_URL = process.env.BASE_URL || OPENAI_URL;
 const DISABLE_GPT4 = !!process.env.DISABLE_GPT4;
 const CPM_BEE_SK = process.env.CPM_BEE_SK || "";
-const CPM_BEE_ENDPOINT = process.env.CPM_BEE_ENDPOINT || "inference";
+const CPM_BEE_INFERENCE_ENDPOINT = process.env.CPM_BEE_INFERENCE_ENDPOINT || "inference";
+const CPM_BEE_ENDPOINT_NAME = process.env.CPM_BEE_ENDPOINT_NAME;
 
 export async function requestOpenai(req: NextRequest) {
   const controller = new AbortController();
@@ -41,7 +42,7 @@ export async function requestOpenai(req: NextRequest) {
   const body = await req.json();
   const isCPMBee = body && body.model && body.model.indexOf("cpm-bee") != -1;
 
-  const fetchUrl = isCPMBee ? `${baseUrl}/${CPM_BEE_ENDPOINT}` : `${baseUrl}/${openaiPath}`;
+  const fetchUrl = isCPMBee ? `${baseUrl}/${CPM_BEE_INFERENCE_ENDPOINT}` : `${baseUrl}/${openaiPath}`;
   const fetchOptions: RequestInit = {
     headers: {
       "Content-Type": "application/json",
@@ -64,33 +65,29 @@ export async function requestOpenai(req: NextRequest) {
     const sig = `${timestamp}${CPM_BEE_SK}`;
     const sign = MD5(Buffer.from(sig, 'utf-8').toString()).toString();
     let input = "";
-    let prompt = "问答";
+    let prompt = "";
     let question = "";
     for (let i = 0; i < body.messages.length; i++) {
       const message = body.messages[i];
-      if (message.role == "system") {
-        if (message.content.trim() != "")
-          question = message.content.trim();
-      } else {
-        input += `${message.role == "user" ? "用户：": "AI："}${message.content.trim()}` + "\n<sep>";
-      }
-      // console.log(message, question, input);
+      const content = message.content.trim();
+      if (content == "")
+        continue;
+      input += `${message.role == "assistant" ? "<AI>": "<用户>"}${message.content.trim()}`;
     }
-    input += `AI:\n`;
-    if (question == "")
-      question = "该如何回复用户？";
+    input += `<AI>`;
     fetchOptions.body = JSON.stringify({
-      endpoint_name: body.model,
+      endpoint_name: CPM_BEE_ENDPOINT_NAME,
       ak: authValue.replace("Bearer ", "").trim(),
       timestamp,
       sign,
       input: JSON.stringify({
         input,
-        prompt,
-        question,
+        ...(prompt != "" && { prompt }),
+        ...(question != "" && { question }),
         "<ans>": ""
       }),
     });
+    console.log("[CPM-Bee] payload:", input);
   }
 
   // #1815 try to refuse gpt4 request
